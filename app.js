@@ -27,7 +27,7 @@ var master = null;
 var pipeline = null;
 var viewers = {};
 var kurentoClient = null;
-
+var playerEndpoint = null;
 function nextUniqueId() {
 	idCounter++;
 	return idCounter.toString();
@@ -155,7 +155,8 @@ function getKurentoClient(callback) {
 function startRTSP(callback) {
 	console.log('********************function startRTSP(callback) {');
 	if (master !== null) {
-		return callback("Master is already running ...");
+		console.error("Error**************Master is not running ...");
+		return ;
 	}
 
 	master = true;
@@ -163,29 +164,40 @@ function startRTSP(callback) {
 	getKurentoClient(function(error, kurentoClient) {
 		if (error) {
 			stop(id);
-			return callback(error);
+			console.error('Error**************getKurentoClient(function(error, kurentoClient) {');
+			//return callback(error);
+			return;
 		}
 
 		kurentoClient.create('MediaPipeline', function(error, _pipeline) {
 			if (error) {
-				return callback(error);
+				console.error("Error**************kurentoClient.create('MediaPipeline', function(error, _pipeline) {");
+				//return callback(error);
+				return;
 			}
 
 			// PlayerEndpoint params
 			var params = {
-				mediaPipeline: _pipeline,
+				//mediaPipeline: _pipeline,
 				uri: rtsp_uri,
-				useEncodedMedia: true // true
+				useEncodedMedia: false // true
 			};
 
 			pipeline = _pipeline;
-			pipeline.create('PlayerEndpoint', params, function(error, PlayerEndpoint) {
+			pipeline.create('PlayerEndpoint', params, function(error, _playerEndpoint) {
 				if (error) {
-					return callback(error);
+					console.error("Error**************pipeline.create('PlayerEndpoint', params, function(error, PlayerEndpoint) {");
+					//return callback(error);
+					return
 				}
-
+				playerEndpoint = _playerEndpoint;
 				console.log('***************Preparing to play');
-				PlayerEndpoint.play(function() {
+				playerEndpoint.play(function(error) {
+					if (error) {
+						console.error("Error**************playerEndpoint.play(function(error) {");
+						//return callback(error);
+						return;
+					}
 					console.log('**************Now playing');
 				});
 
@@ -198,21 +210,25 @@ function startRTSP(callback) {
 function startViewer(id, sdp, ws, callback) {
 	console.log('***************startViewer(id, sdp, ws, callback) {');
 	if (master === null || master.webRtcEndpoint === null) {
+		console.error("Error**************No active streams available. Try again later ...");
 		return callback("No active streams available. Try again later ...");
 	}
 
 	if (viewers[id]) {
+		console.error("Error**************You are already viewing in this session. Use a different browser to add additional viewers.");
 		return callback("You are already viewing in this session. Use a different browser to add additional viewers.")
 	}
 
 	pipeline.create('WebRtcEndpoint', function(error, webRtcEndpoint) {
 		console.log("**************pipeline.create('WebRtcEndpoint',");
 		if (error) {
+			console.error("Error**************pipeline.create('WebRtcEndpoint.");
 			return callback(error);
 		}
 
 		if (master === null) {
 			stop(id);
+			console.error("Error**************No active streams available. Try again later ...");
 			return callback("No active streams available. Try again later ...");
 		}
 		
@@ -247,23 +263,28 @@ function startViewer(id, sdp, ws, callback) {
 			console.log("**************webRtcEndpoint.processOffer(sdp,");
 			if (error) {
 				stop(id);
+				console.error("Error**************webRtcEndpoint.processOffer(sdp,");
 				return callback(error);
 			}
 
 			if (master === null) {
 				stop(id);
+				console.error("Error**************No active streams available. Try again later ...");
 				return callback("No active streams available. Try again later ...");
 			}
 
-			master.webRtcEndpoint.connect(webRtcEndpoint, function(error) {
+			//master.webRtcEndpoint.connect(webRtcEndpoint, function(error) {
+			playerEndpoint.connect(webRtcEndpoint, function(error) {
 				console.log("**************master.webRtcEndpoint.connect(webRtcEndpoint");
 				if (error) {
 					stop(id);
+					console.error("Error**************master.webRtcEndpoint.connect(webRtcEndpoint");
 					return callback(error, getState4Client());
 				}
 
 				if (master === null) {
 					stop(id);
+					console.error("Error**************No active sender now. Become sender or . Try again later ...");
 					return callback("No active sender now. Become sender or . Try again later ...");
 				}
 
@@ -276,6 +297,12 @@ function startViewer(id, sdp, ws, callback) {
 
 				return callback(null, sdpAnswer);
 			});
+		});
+		webRtcEndpoint.gatherCandidates(function(error) {
+			if (error) {
+				stop(sessionId);
+				return callback(error);
+			}
 		});
 	});
 }

@@ -45,6 +45,7 @@ ws.onmessage = function(message) {
 		dispose();
 		break;
 	case 'iceCandidate':
+		console.log("******************************************************iceCandidate message");
 		webRtcPeer.addIceCandidate(parsedMessage.candidate)
 		break;
 	default:
